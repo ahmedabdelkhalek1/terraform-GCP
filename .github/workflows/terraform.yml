@@ -1,46 +1,49 @@
-name: Terraform GCP Deployment
+name: 'Terraform'
 
 on:
   push:
-    paths:
-      - '**/*.tf'
-      - '**/*.tfvars'
-      - '**/*.tfstate'
-    branches:
-      - main
+    branches: [ "main" ]
+  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   terraform:
-    name: Apply Terraform Changes
+    name: 'Terraform'
     runs-on: ubuntu-latest
+    environment: production
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
-    - name: Checkout Repository
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
       uses: actions/checkout@v3
-    - name: Debug GCP Credentials
-          run: |
-            echo "${{ secrets.GCP_CREDENTIALS }}" | jq
-            
+
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v1
       with:
-        terraform_version: 1.5.0
+        cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-    - name: Authenticate to GCP
-      env:
-          GOOGLE_APPLICATION_CREDENTIALS: gcp-key.json
-      run: |
-        printf "%s" "${{ secrets.GCP_CREDENTIALS }}" > gcp-key.json
-        gcloud auth activate-service-account --key-file=gcp-key.json
-        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-
-    - name: Initialize Terraform
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
       run: terraform init
 
-    - name: Plan Terraform Changes
-      run: terraform plan -input=false -out=tfplan
+    # Checks that all Terraform configuration files adhere to a canonical format
+    - name: Terraform Format
+      run: terraform fmt -check
 
-    - name: Apply Terraform Changes
-      run: terraform apply -input=false tfplan
-      env:
-        GOOGLE_APPLICATION_CREDENTIALS: gcp-key.json
+    # Generates an execution plan for Terraform
+    - name: Terraform Plan
+      run: terraform plan -input=false
+
+      # On push to "main", build or change infrastructure according to Terraform configuration files
+      # Note: It is recommended to set up a required "strict" status check in your repository for "Terraform Cloud". See the documentation on "strict" required status checks for more information: https://help.github.com/en/github/administering-a-repository/types-of-required-status-checks
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/"main"' && github.event_name == 'push'
+      run: terraform apply -auto-approve -input=false
