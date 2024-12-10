@@ -1,5 +1,5 @@
 provider "google"{
-  credentials = file("C:\\binaries\\terraform-key.json")
+  credentials = var.gcp_credentials
   project     = "friendly-brand-441407-b4"
   region      = "us-central1"
 }
